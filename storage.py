@@ -67,3 +67,102 @@ class MetadataOptimizer(RegistryManager):
     def optimize_metadata_operations(self):
         self.write_dword(winreg.HKEY_LOCAL_MACHINE, self.KEY_PATH, "NtfsDisableLastAccessUpdate", 1)
         self.write_dword(winreg.HKEY_LOCAL_MACHINE, self.KEY_PATH, "NtfsDisable8dot3NameCreation", 1)
+
+
+class StoragePowerManager:
+    """Gestiona políticas de ahorro de energía en unidades de almacenamiento"""
+    
+    def __init__(self):
+        self.is_laptop = self._detect_laptop()
+        print(f"[StoragePower] Sistema detectado como: {'Portátil' if self.is_laptop else 'Escritorio'}")
+    
+    def _detect_laptop(self):
+        """Detecta si el sistema es un portátil"""
+        try:
+            import psutil
+            battery = psutil.sensors_battery()
+            return battery is not None
+        except Exception:
+            return False
+    
+    def _get_battery_level(self):
+        """Obtiene el nivel de batería"""
+        try:
+            import psutil
+            battery = psutil.sensors_battery()
+            if battery:
+                return battery.percent
+            return 100  # Si no hay batería, asumir 100%
+        except Exception:
+            return 100
+    
+    def disable_storage_power_saving(self):
+        """Desactiva todas las políticas de ahorro de energía en almacenamiento"""
+        # Verificar batería si es portátil
+        if self.is_laptop:
+            battery_level = self._get_battery_level()
+            if battery_level < 20:
+                print(f"[StoragePower] Batería baja ({battery_level}%), manteniendo ahorro de energía")
+                return
+        
+        print("[StoragePower] Desactivando ahorro de energía en almacenamiento...")
+        
+        try:
+            # Deshabilitar apagado de discos duros
+            subprocess.run(
+                ['powercfg', '/setacvalueindex', 'SCHEME_CURRENT', 
+                 'SUB_DISK', 'DISKIDLE', '0'],
+                capture_output=True,
+                creationflags=subprocess.CREATE_NO_WINDOW
+            )
+            
+            subprocess.run(
+                ['powercfg', '/setdcvalueindex', 'SCHEME_CURRENT', 
+                 'SUB_DISK', 'DISKIDLE', '0'],
+                capture_output=True,
+                creationflags=subprocess.CREATE_NO_WINDOW
+            )
+            
+            # Aplicar cambios
+            subprocess.run(
+                ['powercfg', '/setactive', 'SCHEME_CURRENT'],
+                capture_output=True,
+                creationflags=subprocess.CREATE_NO_WINDOW
+            )
+            
+            print("[StoragePower] Políticas de ahorro de energía desactivadas")
+        
+        except Exception as e:
+            print(f"[StoragePower] Error al desactivar ahorro de energía: {e}")
+    
+    def enable_storage_power_saving(self):
+        """Reactiva las políticas de ahorro de energía"""
+        print("[StoragePower] Reactivando ahorro de energía en almacenamiento...")
+        
+        try:
+            # Establecer timeout de 20 minutos
+            subprocess.run(
+                ['powercfg', '/setacvalueindex', 'SCHEME_CURRENT', 
+                 'SUB_DISK', 'DISKIDLE', '1200'],
+                capture_output=True,
+                creationflags=subprocess.CREATE_NO_WINDOW
+            )
+            
+            subprocess.run(
+                ['powercfg', '/setdcvalueindex', 'SCHEME_CURRENT', 
+                 'SUB_DISK', 'DISKIDLE', '600'],
+                capture_output=True,
+                creationflags=subprocess.CREATE_NO_WINDOW
+            )
+            
+            # Aplicar cambios
+            subprocess.run(
+                ['powercfg', '/setactive', 'SCHEME_CURRENT'],
+                capture_output=True,
+                creationflags=subprocess.CREATE_NO_WINDOW
+            )
+            
+            print("[StoragePower] Políticas de ahorro de energía reactivadas")
+        
+        except Exception as e:
+            print(f"[StoragePower] Error al reactivar ahorro de energía: {e}")

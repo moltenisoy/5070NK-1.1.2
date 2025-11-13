@@ -126,6 +126,350 @@ class JobObjectManager:
             kernel32.AssignProcessToJobObject(job_handle, proc_handle)
             # No cerramos el handle del proceso aquí; el Job Object lo gestiona
 
+class AdvancedJobManager:
+    """Gestión avanzada de Job Objects con control exhaustivo"""
+    
+    def __init__(self):
+        self.jobs = {}
+        print("[AdvancedJobManager] Inicializado")
+    
+    def create_gaming_job(self, pids):
+        """Crea Job Object optimizado para juegos"""
+        try:
+            job_name = "GamingJob_" + str(hash(tuple(pids)))
+            job = kernel32.CreateJobObjectW(None, job_name)
+            
+            if not job:
+                print("[AdvancedJobManager] Error creando Job Object")
+                return None
+            
+            # Asignar procesos al job
+            for pid in pids:
+                PROCESS_SET_QUOTA = 0x0100
+                PROCESS_TERMINATE = 0x0001
+                handle = kernel32.OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, False, pid)
+                if handle:
+                    kernel32.AssignProcessToJobObject(job, handle)
+                    kernel32.CloseHandle(handle)
+            
+            self.jobs[job_name] = job
+            print(f"[AdvancedJobManager] Job Object creado para {len(pids)} procesos")
+            return job
+        
+        except Exception as e:
+            print(f"[AdvancedJobManager] Error creando gaming job: {e}")
+            return None
+
+
+class OptimizedServicesManager:
+    """
+    Gestor de servicios optimizados con 3 modos:
+    - APAGADO: Servicios funcionan normalmente
+    - ENCENDIDO: Desactiva servicios innecesarios y ajusta otros
+    - AGRESIVO: Desactiva también telemetría y diagnósticos
+    """
+    
+    # Servicios a desactivar en modo ENCENDIDO
+    SERVICES_TO_DISABLE = [
+        "BITS",  # Background Intelligent Transfer Service
+        "defragsvc",  # Desfragmentación
+        "DoSvc",  # Delivery Optimization
+        "MapsBroker",  # Mapas descargados
+        "SysMain",  # Superfetch
+        "AssignedAccessManagerSvc",
+        "autotimesvc",
+        "AxInstSV",
+        "BcmBtRSupport",
+        "BTAGService",
+        "BthAvctpSvc",
+        "CertPropSvc",
+        "CscService",
+        "DiagTrack",  # Telemetría
+        "diagnosticshub.standardcollector.service",
+        "dmwappushservice",
+        "DusmSvc",
+        "Fax",
+        "fhsvc",
+        "lfsvc",
+        "Netlogon",
+        "NetTcpPortSharing",
+        "RemoteAccess",
+        "RemoteRegistry",
+        "RetailDemo",
+        "ScDeviceEnum",
+        "SCPolicySvc",
+        "SEMgrSvc",
+        "SensorDataService",
+        "SensorMonitoringService",
+        "SensorService",
+        "shpamsvc",
+        "SmsRouter",
+        "Spooler",  # Solo si no usa impresora
+        "TabletInputService",
+        "TapiSrv",
+        "TermService",
+        "UevAgentService",
+        "WalletService",
+        "WbioSrvc",
+        "WerSvc",  # Windows Error Reporting
+        "WFDSConMgrSvc",
+        "WiaRpc",
+        "WlanSvc"  # Solo si usa Ethernet
+    ]
+    
+    # Servicios a pasar a inicio MANUAL
+    SERVICES_TO_MANUAL = [
+        "WMPNetworkSvc",  # Windows Media Player Network Sharing
+        "WSearch",  # Windows Search
+        "wuauserv",  # Windows Update
+        "UsoSvc",  # Update Orchestrator Service
+        "WaaSMedicSvc",  # Windows Update Medic Service
+        "uhssvc",  # Microsoft Update Health Service
+        "upfc",  # Update Facilitator Service
+    ]
+    
+    # Servicios adicionales de telemetría y diagnóstico (modo AGRESIVO)
+    TELEMETRY_SERVICES = [
+        "DiagTrack",
+        "dmwappushservice",
+        "diagnosticshub.standardcollector.service",
+        "WerSvc",
+        "wercplsupport",
+        "PcaSvc",
+        "DPS",
+        "WdiServiceHost",
+        "WdiSystemHost",
+        "TrkWks",
+        "SysMain",
+        "CDPSvc",
+        "CDPUserSvc",
+        "OneSyncSvc",
+        "UnistoreSvc"
+    ]
+    
+    # Procesos que pueden detenerse durante gaming local
+    LOCAL_GAMING_STOPPABLE = [
+        "OneDrive.exe",
+        "SkypeApp.exe",
+        "Spotify.exe",
+        "Discord.exe",  # Si no se usa para comunicación
+        "Steam.exe",  # Excepto el juego que se está ejecutando
+        "EpicGamesLauncher.exe",
+        "Origin.exe",
+        "upc.exe",  # Ubisoft Connect
+        "Dropbox.exe",
+        "GoogleDriveFS.exe",
+        "Teams.exe",
+        "Slack.exe",
+        "Chrome.exe",  # Navegadores
+        "Firefox.exe",
+        "MicrosoftEdge.exe",
+        "Outlook.exe",
+        "EXCEL.EXE",
+        "WINWORD.EXE",
+        "POWERPNT.EXE"
+    ]
+    
+    # Procesos para gaming online (mantener conectividad)
+    ONLINE_GAMING_STOPPABLE = [
+        "OneDrive.exe",
+        "Dropbox.exe",
+        "GoogleDriveFS.exe",
+        "Teams.exe",
+        "Slack.exe",
+        "Outlook.exe",
+        "EXCEL.EXE",
+        "WINWORD.EXE",
+        "POWERPNT.EXE",
+        "Spotify.exe"  # Excepto si se usa música de fondo
+    ]
+    
+    def __init__(self):
+        self.current_mode = "OFF"  # OFF, ON, AGGRESSIVE
+        self.original_states = {}  # Para restaurar
+        self.stopped_processes = []
+        print("[OptimizedServices] Gestor de servicios inicializado en modo OFF")
+    
+    def set_mode(self, mode):
+        """Establece el modo: OFF, ON, o AGGRESSIVE"""
+        mode = mode.upper()
+        if mode not in ["OFF", "ON", "AGGRESSIVE"]:
+            print(f"[OptimizedServices] Modo inválido: {mode}")
+            return False
+        
+        print(f"[OptimizedServices] Cambiando modo de {self.current_mode} a {mode}")
+        
+        if mode == "OFF":
+            self._restore_original_state()
+        elif mode == "ON":
+            self._apply_standard_optimizations()
+        elif mode == "AGGRESSIVE":
+            self._apply_aggressive_optimizations()
+        
+        self.current_mode = mode
+        return True
+    
+    def _get_service_startup_type(self, service_name):
+        """Obtiene el tipo de inicio actual de un servicio"""
+        try:
+            import subprocess
+            result = subprocess.run(
+                ['sc', 'qc', service_name],
+                capture_output=True,
+                text=True,
+                creationflags=subprocess.CREATE_NO_WINDOW
+            )
+            
+            if 'START_TYPE' in result.stdout:
+                if 'AUTO_START' in result.stdout:
+                    return 'auto'
+                elif 'DEMAND_START' in result.stdout:
+                    return 'demand'
+                elif 'DISABLED' in result.stdout:
+                    return 'disabled'
+            
+            return None
+        except Exception:
+            return None
+    
+    def _apply_standard_optimizations(self):
+        """Aplica optimizaciones estándar (modo ON)"""
+        print("[OptimizedServices] Aplicando optimizaciones estándar...")
+        
+        # Guardar estado original antes de cambiar
+        for service in self.SERVICES_TO_DISABLE + self.SERVICES_TO_MANUAL:
+            if service not in self.original_states:
+                startup_type = self._get_service_startup_type(service)
+                if startup_type:
+                    self.original_states[service] = startup_type
+        
+        # Desactivar servicios
+        disabled_count = 0
+        for service in self.SERVICES_TO_DISABLE:
+            if self._disable_service(service):
+                disabled_count += 1
+        
+        print(f"[OptimizedServices] Desactivados {disabled_count} servicios")
+        
+        # Pasar a manual
+        manual_count = 0
+        for service in self.SERVICES_TO_MANUAL:
+            if self._set_service_manual(service):
+                manual_count += 1
+        
+        print(f"[OptimizedServices] {manual_count} servicios configurados en inicio manual")
+    
+    def _apply_aggressive_optimizations(self):
+        """Aplica optimizaciones agresivas (modo AGGRESSIVE)"""
+        print("[OptimizedServices] Aplicando optimizaciones AGRESIVAS...")
+        
+        # Primero aplicar optimizaciones estándar
+        self._apply_standard_optimizations()
+        
+        # Luego desactivar telemetría y diagnósticos
+        telemetry_count = 0
+        for service in self.TELEMETRY_SERVICES:
+            if service not in self.original_states:
+                startup_type = self._get_service_startup_type(service)
+                if startup_type:
+                    self.original_states[service] = startup_type
+            
+            if self._disable_service(service):
+                telemetry_count += 1
+        
+        print(f"[OptimizedServices] Desactivados {telemetry_count} servicios de telemetría/diagnóstico")
+    
+    def _restore_original_state(self):
+        """Restaura el estado original de todos los servicios"""
+        print("[OptimizedServices] Restaurando estado original de servicios...")
+        
+        restored_count = 0
+        for service, startup_type in self.original_states.items():
+            if self._set_service_startup_type(service, startup_type):
+                restored_count += 1
+        
+        print(f"[OptimizedServices] Restaurados {restored_count} servicios")
+        self.original_states.clear()
+    
+    def _disable_service(self, service_name):
+        """Desactiva un servicio"""
+        try:
+            import subprocess
+            # Detener servicio
+            subprocess.run(
+                ['sc', 'stop', service_name],
+                capture_output=True,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+                timeout=5
+            )
+            
+            # Deshabilitar servicio
+            result = subprocess.run(
+                ['sc', 'config', service_name, 'start=', 'disabled'],
+                capture_output=True,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+                timeout=5
+            )
+            
+            return result.returncode == 0
+        except Exception as e:
+            # Servicio puede no existir o no tener permisos
+            return False
+    
+    def _set_service_manual(self, service_name):
+        """Establece un servicio en inicio manual"""
+        try:
+            import subprocess
+            result = subprocess.run(
+                ['sc', 'config', service_name, 'start=', 'demand'],
+                capture_output=True,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+                timeout=5
+            )
+            return result.returncode == 0
+        except Exception:
+            return False
+    
+    def _set_service_startup_type(self, service_name, startup_type):
+        """Establece el tipo de inicio de un servicio"""
+        try:
+            import subprocess
+            type_map = {
+                'auto': 'auto',
+                'demand': 'demand',
+                'disabled': 'disabled'
+            }
+            
+            sc_type = type_map.get(startup_type, 'demand')
+            result = subprocess.run(
+                ['sc', 'config', service_name, 'start=', sc_type],
+                capture_output=True,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+                timeout=5
+            )
+            return result.returncode == 0
+        except Exception:
+            return False
+    
+    def stop_processes_for_gaming(self, mode='local'):
+        """Detiene procesos según el modo de gaming (local u online)"""
+        process_list = self.LOCAL_GAMING_STOPPABLE if mode == 'local' else self.ONLINE_GAMING_STOPPABLE
+        
+        print(f"[OptimizedServices] Deteniendo procesos para gaming {mode}...")
+        
+        stopped_count = 0
+        for proc in psutil.process_iter(['pid', 'name']):
+            try:
+                if proc.info['name'] in process_list:
+                    proc.terminate()
+                    self.stopped_processes.append(proc.info['pid'])
+                    stopped_count += 1
+            except Exception:
+                pass
+        
+        print(f"[OptimizedServices] Detenidos {stopped_count} procesos")
+
+
 class ProcessManager:
     """Clase principal que agrupa todas las funcionalidades de gestión de procesos."""
     def __init__(self):
@@ -133,6 +477,10 @@ class ProcessManager:
         self.settings_applicator = BatchedSettingsApplicator(self.handle_cache)
         self.suspension_manager = ProcessSuspensionManager()
         self.job_manager = JobObjectManager()
+        
+        # Nuevos gestores
+        self.advanced_job_manager = AdvancedJobManager()
+        self.services_manager = OptimizedServicesManager()
 
     def apply_eco_qos_to_all_background(self, foreground_pid):
         for p in psutil.process_iter(['pid']):

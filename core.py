@@ -894,6 +894,163 @@ def get_thread_cache():
 
 
 # =============================================================================
+# --- GESTOR DE PRIVILEGIOS MEJORADO ---
+# =============================================================================
+
+# Constantes de privilegios adicionales
+SE_DEBUG_NAME = "SeDebugPrivilege"
+SE_LOCK_MEMORY_NAME = "SeLockMemoryPrivilege"
+SE_INCREASE_BASE_PRIORITY_NAME = "SeIncreaseBasePriorityPrivilege"
+SE_INCREASE_QUOTA_NAME = "SeIncreaseQuotaPrivilege"
+SE_PROF_SINGLE_PROCESS_NAME = "SeProfileSingleProcessPrivilege"
+SE_SYSTEM_PROFILE_NAME = "SeSystemProfilePrivilege"
+
+class PrivilegeManager:
+    """Gestión avanzada de privilegios del sistema"""
+    
+    def __init__(self):
+        self.required_privileges = [
+            SE_DEBUG_NAME,
+            SE_LOCK_MEMORY_NAME,
+            SE_INCREASE_BASE_PRIORITY_NAME,
+            SE_INCREASE_QUOTA_NAME,
+            SE_PROF_SINGLE_PROCESS_NAME,
+            SE_SYSTEM_PROFILE_NAME
+        ]
+        
+        self.privilege_status = {}
+        logger.info("[PrivilegeManager] Inicializando gestor de privilegios")
+    
+    def check_all_privileges(self):
+        """Verifica estado de todos los privilegios"""
+        for priv in self.required_privileges:
+            self.privilege_status[priv] = self.is_privilege_enabled(priv)
+        
+        enabled_count = sum(1 for v in self.privilege_status.values() if v)
+        logger.info(f"[PrivilegeManager] {enabled_count}/{len(self.required_privileges)} privilegios habilitados")
+        return self.privilege_status
+    
+    def is_privilege_enabled(self, privilege_name):
+        """Verifica si un privilegio está habilitado"""
+        try:
+            # Usar la función existente enable_privilege
+            return enable_privilege(privilege_name)
+        except Exception as e:
+            logger.warning(f"[PrivilegeManager] No se pudo verificar privilegio {privilege_name}: {e}")
+            return False
+    
+    def elevate_if_needed(self):
+        """Solicita elevación si es necesario"""
+        if not ctypes.windll.shell32.IsUserAnAdmin():
+            logger.warning("[PrivilegeManager] Requiere privilegios de administrador")
+            return self.request_elevation()
+        return True
+    
+    def request_elevation(self):
+        """Solicita UAC elevation"""
+        import sys
+        try:
+            ctypes.windll.shell32.ShellExecuteW(
+                None, 
+                "runas", 
+                sys.executable, 
+                " ".join(sys.argv), 
+                None, 
+                1
+            )
+            logger.info("[PrivilegeManager] Solicitada elevación UAC")
+            return True
+        except Exception as e:
+            logger.error(f"[PrivilegeManager] Error al solicitar elevación: {e}")
+            return False
+
+
+# =============================================================================
+# --- POOL DE THREADS OPTIMIZADO ---
+# =============================================================================
+
+import queue as queue_module
+
+class SystemThreadPool:
+    """Pool de threads optimizado para operaciones del sistema"""
+    
+    def __init__(self, num_threads=4):
+        self.num_threads = num_threads
+        self.task_queue = queue_module.PriorityQueue()
+        self.threads = []
+        self.running = True
+        
+        logger.info(f"[SystemThreadPool] Inicializando pool con {num_threads} threads")
+        
+        for i in range(num_threads):
+            thread = threading.Thread(
+                target=self._worker,
+                name=f"SystemWorker-{i}",
+                daemon=True
+            )
+            thread.start()
+            self.threads.append(thread)
+        
+        logger.info(f"[SystemThreadPool] Pool iniciado con {len(self.threads)} workers")
+    
+    def submit(self, priority, func, *args, **kwargs):
+        """Envía tarea con prioridad (menor número = mayor prioridad)"""
+        self.task_queue.put((priority, func, args, kwargs))
+    
+    def _worker(self):
+        """Worker thread que procesa tareas"""
+        while self.running:
+            try:
+                priority, func, args, kwargs = self.task_queue.get(timeout=1)
+                try:
+                    func(*args, **kwargs)
+                except Exception as e:
+                    logger.error(f"[SystemThreadPool] Error en tarea: {e}")
+                finally:
+                    self.task_queue.task_done()
+            except queue_module.Empty:
+                continue
+            except Exception as e:
+                logger.error(f"[SystemThreadPool] Error en worker: {e}")
+    
+    def shutdown(self):
+        """Detiene el pool de threads"""
+        logger.info("[SystemThreadPool] Deteniendo pool...")
+        self.running = False
+        for thread in self.threads:
+            thread.join(timeout=2)
+        logger.info("[SystemThreadPool] Pool detenido")
+
+
+# =============================================================================
+# --- CONTEXT MANAGERS PARA RECURSOS ---
+# =============================================================================
+
+from contextlib import contextmanager
+
+@contextmanager
+def process_handle(pid, access=PROCESS_ALL_ACCESS):
+    """Context manager para handles de proceso"""
+    handle = kernel32.OpenProcess(access, False, pid)
+    try:
+        yield handle
+    finally:
+        if handle:
+            kernel32.CloseHandle(handle)
+
+
+@contextmanager
+def thread_handle(thread_id, access=THREAD_ALL_ACCESS):
+    """Context manager para handles de thread"""
+    handle = kernel32.OpenThread(access, False, thread_id)
+    try:
+        yield handle
+    finally:
+        if handle:
+            kernel32.CloseHandle(handle)
+
+
+# =============================================================================
 # --- MAIN (Pruebas) ---
 # =============================================================================
 

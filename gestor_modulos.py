@@ -423,6 +423,115 @@ class DriverKernelMode:
 
 
 # -----------------------------------------------------------------------------
+# --- SISTEMA DE EVENTOS PUB/SUB ---
+# -----------------------------------------------------------------------------
+
+import queue
+
+class EventBus:
+    """Bus de eventos para comunicación desacoplada entre componentes"""
+    
+    def __init__(self):
+        self.subscribers = defaultdict(list)
+        self.event_queue = queue.Queue()
+        
+    def subscribe(self, event_type, callback):
+        """Suscribirse a un tipo de evento"""
+        self.subscribers[event_type].append(callback)
+        logger.debug(f"[EventBus] Suscripción registrada: {event_type}")
+    
+    def publish(self, event_type, data):
+        """Publicar un evento"""
+        self.event_queue.put((event_type, data))
+        logger.debug(f"[EventBus] Evento publicado: {event_type}")
+    
+    def process_events(self):
+        """Procesar eventos en cola"""
+        processed = 0
+        while not self.event_queue.empty():
+            try:
+                event_type, data = self.event_queue.get_nowait()
+                for callback in self.subscribers[event_type]:
+                    try:
+                        callback(data)
+                    except Exception as e:
+                        logger.error(f"[EventBus] Error en callback de evento {event_type}: {e}")
+                processed += 1
+            except queue.Empty:
+                break
+        
+        if processed > 0:
+            logger.debug(f"[EventBus] Procesados {processed} eventos")
+
+
+# -----------------------------------------------------------------------------
+# --- GESTOR DE PRIORIDADES DINÁMICAS ---
+# -----------------------------------------------------------------------------
+
+class DynamicPriorityManager:
+    """Gestiona prioridades dinámicamente basándose en contexto del sistema"""
+    
+    def __init__(self):
+        self.priority_rules = []
+        logger.info("[DynamicPriority] Inicializando gestor de prioridades dinámicas")
+        self._setup_default_rules()
+    
+    def add_rule(self, condition, action, description=""):
+        """Agrega una regla de prioridad"""
+        self.priority_rules.append((condition, action, description))
+        if description:
+            logger.info(f"[DynamicPriority] Regla añadida: {description}")
+    
+    def evaluate(self, context):
+        """Evalúa reglas y devuelve ajustes de prioridad"""
+        adjustments = {}
+        
+        for condition, action, description in self.priority_rules:
+            try:
+                if condition(context):
+                    adjustments.update(action(context))
+                    if description:
+                        logger.debug(f"[DynamicPriority] Regla activada: {description}")
+            except Exception as e:
+                logger.error(f"[DynamicPriority] Error evaluando regla: {e}")
+        
+        return adjustments
+    
+    def _setup_default_rules(self):
+        """Configura reglas predeterminadas"""
+        
+        # Regla: Si batería baja, reducir prioridades de fondo
+        self.add_rule(
+            condition=lambda ctx: ctx.get('battery_level', 100) < 20 and ctx.get('is_laptop', False),
+            action=lambda ctx: {'all_background': 'IDLE', 'reduce_cpu_usage': True},
+            description="Batería baja: reducir consumo"
+        )
+        
+        # Regla: Si gaming y temperatura alta, reducir background
+        self.add_rule(
+            condition=lambda ctx: ctx.get('mode') == 'gaming' and ctx.get('temperature', 0) > 85,
+            action=lambda ctx: {'background_processes': 'BELOW_NORMAL', 'throttle_background': True},
+            description="Gaming + temperatura alta: throttling de fondo"
+        )
+        
+        # Regla: Si modo extreme y CPU libre, boost foreground
+        self.add_rule(
+            condition=lambda ctx: ctx.get('mode') == 'extreme' and ctx.get('cpu_usage', 100) < 50,
+            action=lambda ctx: {'foreground': 'REALTIME', 'boost_foreground': True},
+            description="Modo extreme + CPU libre: boost foreground"
+        )
+        
+        # Regla: Si memoria baja, liberar agresivamente
+        self.add_rule(
+            condition=lambda ctx: ctx.get('memory_available_mb', float('inf')) < 2048,
+            action=lambda ctx: {'trim_all_background': True, 'aggressive_gc': True},
+            description="Memoria baja: liberación agresiva"
+        )
+        
+        logger.info(f"[DynamicPriority] Configuradas {len(self.priority_rules)} reglas predeterminadas")
+
+
+# -----------------------------------------------------------------------------
 # --- MODO EXTREME LOW LATENCY ---
 # -----------------------------------------------------------------------------
 
