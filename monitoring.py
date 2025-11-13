@@ -26,34 +26,56 @@ class HardwareDetector:
         self.is_ssd = any(st['MediaType'] == 'SSD' for st in self.storage_info)
         self.is_nvme = any('nvme' in st['InterfaceType'].lower() for st in self.storage_info)
 
-    def _execute_wmic(self, command):
+    def _execute_wmic(self, command_args):
+        """
+        Ejecuta un comando WMIC de forma segura sin shell=True.
+        
+        :param command_args: Lista de argumentos del comando
+        :return: Salida del comando o string vacío en caso de error
+        """
         try:
+            # SECURITY: Usar lista de argumentos en lugar de shell=True para prevenir
+            # inyección de comandos. Los argumentos se pasan directamente al ejecutable.
             result = subprocess.run(
-                command,
-                shell=True,
+                command_args,
+                shell=False,  # SECURITY: Deshabilitado para prevenir inyección
                 capture_output=True,
                 text=True,
                 check=True,
-                creationflags=subprocess.CREATE_NO_WINDOW
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
             )
             return result.stdout.strip()
         except (subprocess.CalledProcessError, FileNotFoundError) as e:
-            print(f"Error al ejecutar WMIC '{command[0]}...': {e}")
+            print(f"Error al ejecutar WMIC: {e}")
             return ""
 
     def _detect_cpu(self):
-        output = self._execute_wmic("wmic cpu get manufacturer,name /format:list")
-        info = {k.strip().lower(): v.strip() for k, v in (line.split('=', 1) for line in output.splitlines() if '=' in line)}
+        """Detecta información de la CPU usando WMIC."""
+        output = self._execute_wmic(['wmic', 'cpu', 'get', 'manufacturer,name', '/format:list'])
+        info = {}
+        for line in output.splitlines():
+            if '=' in line:
+                key, value = line.split('=', 1)
+                info[key.strip().lower()] = value.strip()
         return info
 
     def _detect_gpu(self):
-        output = self._execute_wmic("wmic path win32_VideoController get name /format:list")
-        info = {'gpus': [v.strip() for k, v in (line.split('=', 1) for line in output.splitlines() if '=' in line)]}
-        return info
+        """Detecta información de la GPU usando WMIC."""
+        output = self._execute_wmic(['wmic', 'path', 'win32_VideoController', 'get', 'name', '/format:list'])
+        gpus = []
+        for line in output.splitlines():
+            if '=' in line:
+                _, value = line.split('=', 1)
+                if value.strip():
+                    gpus.append(value.strip())
+        return {'gpus': gpus}
 
     def _detect_storage(self):
-        # Esta consulta es más compleja y puede devolver múltiples bloques por disco
-        output = self._execute_wmic("wmic diskdrive get MediaType,Model,InterfaceType /format:list")
+        """
+        Detecta información del almacenamiento usando WMIC.
+        Esta consulta puede devolver múltiples bloques por disco.
+        """
+        output = self._execute_wmic(['wmic', 'diskdrive', 'get', 'MediaType,Model,InterfaceType', '/format:list'])
         devices = []
         current_device = {}
         for line in output.splitlines():

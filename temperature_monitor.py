@@ -4,9 +4,17 @@ Módulo de Monitoreo de Temperatura
 
 Utiliza LibreHardwareMonitorLib.dll para monitorear temperaturas
 del sistema en tiempo real.
+
+Dependencias externas:
+- clr (pythonnet): Proporciona interoperabilidad con .NET CLR
+  Instalación: pip install pythonnet
+  Usado para cargar y comunicarse con LibreHardwareMonitorLib.dll
+- LibreHardwareMonitorLib.dll: Biblioteca .NET para acceso a sensores de hardware
+  Debe estar presente en el mismo directorio que este script
+  Descarga: https://github.com/LibreHardwareMonitor/LibreHardwareMonitor
 """
 
-import clr
+import clr  # type: ignore  # pythonnet no tiene stubs de tipo
 import sys
 import os
 import logging

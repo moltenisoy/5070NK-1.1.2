@@ -3,21 +3,26 @@ Módulo de Gestión de Configuración
 ----------------------------------
 
 Maneja la persistencia de configuraciones del sistema de optimización.
+
+Dependencias externas:
+- json: Biblioteca estándar de Python para parseo/serialización JSON
+- os: Biblioteca estándar para operaciones del sistema de archivos
+- logging: Biblioteca estándar para logging
 """
 
 import json
 import os
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 logger = logging.getLogger("ConfigManager")
 
 class ConfigManager:
     """Gestiona la carga y guardado de configuraciones."""
     
-    def __init__(self, config_file="optimizer_config.json"):
-        self.config_file = config_file
-        self.config = self._load_default_config()
+    def __init__(self, config_file: str = "optimizer_config.json") -> None:
+        self.config_file: str = config_file
+        self.config: Dict[str, Any] = self._load_default_config()
         self.load()
     
     def _load_default_config(self) -> Dict[str, Any]:
@@ -72,7 +77,7 @@ class ConfigManager:
             logger.error(f"Error al guardar configuración: {e}")
             return False
     
-    def get(self, key: str, default=None) -> Any:
+    def get(self, key: str, default: Optional[Any] = None) -> Any:
         """Obtiene un valor de configuración."""
         return self.config.get(key, default)
     

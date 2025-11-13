@@ -14,6 +14,20 @@ NUEVAS CARACTERÍSTICAS:
 - ✅ Herramientas de caché y optimización mejoradas
 - ✅ Decoradores de memoización con TTL
 - ✅ Pool de estructuras ctypes para reducir GC
+
+Dependencias de Windows API:
+- ctypes.WinDLL: Acceso directo a DLLs de Windows
+  - kernel32.dll: Gestión de procesos, threads, memoria y dispositivos
+  - ntdll.dll: Funciones nativas de bajo nivel del NT kernel
+  - advapi32.dll: Funciones de seguridad y privilegios
+  - user32.dll: Funciones de ventanas y eventos de interfaz
+  - winmm.dll: Funciones multimedia y de tiempo
+  - powrprof.dll: Funciones de gestión de energía
+  
+Nota de compatibilidad:
+- Este módulo requiere Windows 10 20H2+ o Windows 11
+- Requiere privilegios de administrador para muchas funciones
+- WinDLL y WINFUNCTYPE son proporcionados por ctypes estándar de Python
 """
 
 import ctypes
@@ -488,8 +502,9 @@ class ProcessHandleCache:
             for handle in self._cache.values():
                 try:
                     kernel32.CloseHandle(handle)
-                except:
-                    pass
+                except Exception as e:
+                    # Ignorar errores al cerrar handles (pueden estar ya cerrados)
+                    logger.debug(f"Error cerrando handle: {e}")
             self._cache.clear()
             logger.info(f"[ProcessHandleCache] Caché limpiada. Stats: {self.hits} hits, {self.misses} misses")
 
@@ -542,8 +557,9 @@ class ThreadHandleCache:
             for handle in self._cache.values():
                 try:
                     kernel32.CloseHandle(handle)
-                except:
-                    pass
+                except Exception as e:
+                    # Ignorar errores al cerrar handles (pueden estar ya cerrados)
+                    logger.debug(f"Error cerrando handle de thread: {e}")
             self._cache.clear()
 
 
