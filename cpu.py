@@ -6,6 +6,7 @@ Implementa las estrategias avanzadas de planificación y afinidad, basándose
 en la topología detectada por ModuloMonitorizacion.
 """
 import psutil
+import core
 
 class HeterogeneousScheduler:
     """Gestiona la planificación en arquitecturas híbridas (P-cores/E-cores)."""
@@ -51,7 +52,7 @@ class AVXInstructionOptimizer:
             target_cores = all_cores[:len(all_cores) // 2]
             return {
                 'affinity': target_cores,
-                'priority': win32process.ABOVE_NORMAL_PRIORITY_CLASS
+                'priority': 32768  # ABOVE_NORMAL_PRIORITY_CLASS
             }
         return {}
 

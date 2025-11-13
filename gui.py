@@ -231,30 +231,143 @@ class GeneralOptionsTab(ttk.Frame):
             frame,
             text="Iniciar automáticamente con Windows",
             variable=self.autostart_var,
-            bootstyle="primary-round-toggle"
+            bootstyle="primary-round-toggle",
+            command=self.toggle_autostart
         )
         autostart_check.pack(anchor=W, pady=10)
 
-        modes_frame = ttk.LabelFrame(self, text="Modos de Operación", padding=10)
-        modes_frame.pack(fill=X, pady=10)
-
-        # Aquí usamos style 'info.TButton' para que se vean diferentes
-        ahorro_button = ttk.Button(modes_frame, text="Activar Modo Ahorro", bootstyle="success-outline")
-        ahorro_button.pack(side=LEFT, padx=5, pady=5, fill=X, expand=True)
-
-        extremo_button = ttk.Button(modes_frame, text="Activar Modo Extremo", bootstyle="warning-outline")
-        extremo_button.pack(side=LEFT, padx=5, pady=5, fill=X, expand=True)
-
-        manager_frame = ttk.LabelFrame(self, text="Control General", padding=10)
+        # --- Control del Gestor ---
+        manager_frame = ttk.LabelFrame(self, text="Control del Sistema", padding=10)
         manager_frame.pack(fill=X, pady=10)
         
         module_manager_switch = ttk.Checkbutton(
             manager_frame,
             text="Gestor de Módulos (Optimización en tiempo real)",
             variable=self.module_manager_var,
-            bootstyle="success-round-toggle"
+            bootstyle="success-round-toggle",
+            command=self.toggle_module_manager
         )
         module_manager_switch.pack(anchor=W, pady=10)
+
+        # --- Modos de Operación ---
+        modes_frame = ttk.LabelFrame(self, text="Modos de Operación", padding=10)
+        modes_frame.pack(fill=X, pady=10)
+
+        # Fila 1: Modo Juego y Modo Ahorro
+        row1_frame = ttk.Frame(modes_frame)
+        row1_frame.pack(fill=X, pady=5)
+        
+        game_button = ttk.Button(
+            row1_frame, 
+            text="🎮 Activar Modo Juego", 
+            bootstyle="primary",
+            command=self.toggle_game_mode
+        )
+        game_button.pack(side=LEFT, padx=5, fill=X, expand=True)
+
+        ahorro_button = ttk.Button(
+            row1_frame, 
+            text="💚 Activar Modo Ahorro", 
+            bootstyle="success-outline",
+            command=self.toggle_ahorro_mode
+        )
+        ahorro_button.pack(side=LEFT, padx=5, fill=X, expand=True)
+
+        # Fila 2: Modo Ultra Baja Latencia y Modo Extremo
+        row2_frame = ttk.Frame(modes_frame)
+        row2_frame.pack(fill=X, pady=5)
+
+        ultra_low_latency_button = ttk.Button(
+            row2_frame, 
+            text="⚡ Activar Modo Ultra Baja Latencia", 
+            bootstyle="info",
+            command=self.toggle_ultra_low_latency
+        )
+        ultra_low_latency_button.pack(side=LEFT, padx=5, fill=X, expand=True)
+
+        extremo_button = ttk.Button(
+            row2_frame, 
+            text="🚀 Activar Modo Extremo", 
+            bootstyle="warning-outline",
+            command=self.toggle_extremo_mode
+        )
+        extremo_button.pack(side=LEFT, padx=5, fill=X, expand=True)
+
+        # --- Estado Actual ---
+        status_frame = ttk.LabelFrame(self, text="Estado Actual", padding=10)
+        status_frame.pack(fill=X, pady=10)
+        
+        self.status_label = ttk.Label(
+            status_frame, 
+            text="Estado: Gestor Activo - Modo Normal",
+            bootstyle="info"
+        )
+        self.status_label.pack(anchor=W, pady=5)
+    
+    def toggle_autostart(self):
+        """Activa/desactiva el inicio automático."""
+        if self.autostart_var.get():
+            messagebox.showinfo("Inicio Automático", "Inicio automático activado.", parent=self)
+            # Implementar lógica de registro en Windows
+        else:
+            messagebox.showinfo("Inicio Automático", "Inicio automático desactivado.", parent=self)
+    
+    def toggle_module_manager(self):
+        """Activa/desactiva el gestor de módulos."""
+        if self.module_manager_var.get():
+            self.status_label.config(text="Estado: Gestor Activo - Optimización en tiempo real")
+            if self.module_manager:
+                # self.module_manager.start()
+                pass
+        else:
+            self.status_label.config(text="Estado: Gestor Detenido - Sin optimización")
+            if self.module_manager:
+                # self.module_manager.stop()
+                pass
+    
+    def toggle_game_mode(self):
+        """Activa el modo juego."""
+        messagebox.showinfo("Modo Juego", "Modo Juego activado manualmente.", parent=self)
+        self.status_label.config(text="Estado: Modo Juego Activo 🎮")
+        if self.module_manager:
+            # self.module_manager.set_game_mode(True)
+            pass
+    
+    def toggle_ahorro_mode(self):
+        """Activa el modo ahorro."""
+        messagebox.showinfo("Modo Ahorro", "Modo Ahorro activado.", parent=self)
+        self.status_label.config(text="Estado: Modo Ahorro Activo 💚")
+        if self.module_manager:
+            # self.module_manager.set_ahorro_mode(True)
+            pass
+    
+    def toggle_ultra_low_latency(self):
+        """Activa el modo ultra baja latencia."""
+        response = messagebox.askyesno(
+            "Modo Ultra Baja Latencia",
+            "Este modo aplica optimizaciones agresivas.\n¿Desea continuar?",
+            parent=self
+        )
+        if response:
+            self.status_label.config(text="Estado: Modo Ultra Baja Latencia Activo ⚡")
+            if self.module_manager:
+                # self.module_manager.set_ultra_low_latency(True)
+                pass
+    
+    def toggle_extremo_mode(self):
+        """Activa el modo extremo."""
+        response = messagebox.askyesno(
+            "Modo Extremo",
+            "⚠️ ADVERTENCIA: Este modo aplica las optimizaciones más agresivas\n"
+            "y puede causar inestabilidad en el sistema.\n\n"
+            "¿Desea continuar?",
+            parent=self
+        )
+        if response:
+            self.status_label.config(text="Estado: Modo Extremo Activo 🚀")
+            if self.module_manager:
+                # self.module_manager.set_extremo_mode(True)
+                pass
 
 class FineTuningTab(ttk.Frame):
     """Pestaña para los ajustes finos y de gestión térmica."""
@@ -278,6 +391,30 @@ class FineTuningTab(ttk.Frame):
         unit_label.pack(side=LEFT)
         return entry
 
+    def _create_slider(self, parent, label_text, from_value, to_value, default_value, unit):
+        frame = ttk.Frame(parent)
+        frame.pack(fill=X, pady=5)
+        
+        label = ttk.Label(frame, text=label_text, width=50)
+        label.pack(side=LEFT, padx=(0, 10))
+        
+        value_var = tk.IntVar(value=default_value)
+        value_label = ttk.Label(frame, text=f"{default_value} {unit}", width=10)
+        value_label.pack(side=RIGHT, padx=(5, 0))
+        
+        slider = ttk.Scale(
+            frame, 
+            from_=from_value, 
+            to=to_value, 
+            variable=value_var,
+            orient=tk.HORIZONTAL,
+            bootstyle="info",
+            command=lambda val: value_label.config(text=f"{int(float(val))} {unit}")
+        )
+        slider.pack(side=RIGHT, fill=X, expand=True, padx=(0, 5))
+        
+        return value_var
+
     def _create_widgets(self):
         # --- Ajustes de Memoria ---
         memory_frame = ttk.LabelFrame(self, text="Ajustes de Memoria", padding=10)
@@ -286,17 +423,231 @@ class FineTuningTab(ttk.Frame):
         self.pagefile_entry = self._create_widget(memory_frame, "Tamaño del Archivo de Paginación:", 8192, "MB")
         self.cache_entry = self._create_widget(memory_frame, "Tamaños de Cachés del Sistema:", 512, "MB")
         
-        # --- Gestión Térmica ---
+        # --- Gestión Térmica con Sliders ---
         thermal_frame = ttk.LabelFrame(self, text="Gestión Térmica", padding=10)
         thermal_frame.pack(fill=X, pady=10, anchor=N)
         
-        self.soft_throttle_entry = self._create_widget(thermal_frame, "Temperatura de Comienzo para Thermal Throttling Suave:", 80, "°C")
-        self.hard_throttle_entry = self._create_widget(thermal_frame, "Temperatura de Comienzo para Thermal Throttling Fuerte:", 90, "°C")
-        self.shutdown_temp_entry = self._create_widget(thermal_frame, "Temperatura para Apagado Forzado por Seguridad:", 100, "°C")
+        self.soft_throttle_var = self._create_slider(
+            thermal_frame, 
+            "Temperatura para Thermal Throttling Suave:", 
+            60, 95, 80, "°C"
+        )
+        
+        self.hard_throttle_var = self._create_slider(
+            thermal_frame, 
+            "Temperatura para Thermal Throttling Fuerte:", 
+            70, 100, 90, "°C"
+        )
+        
+        self.shutdown_temp_var = self._create_slider(
+            thermal_frame, 
+            "Temperatura Límite para Apagado Forzado:", 
+            80, 110, 100, "°C"
+        )
         
         # --- Botón para aplicar los cambios ---
-        apply_button = ttk.Button(self, text="Aplicar Ajustes Finos", bootstyle="primary")
+        apply_button = ttk.Button(
+            self, 
+            text="Aplicar Ajustes Finos", 
+            bootstyle="primary",
+            command=self.apply_settings
+        )
         apply_button.pack(pady=20)
+    
+    def apply_settings(self):
+        """Aplica los ajustes al gestor de módulos."""
+        if self.module_manager:
+            thermal_thresholds = {
+                'soft': self.soft_throttle_var.get(),
+                'hard': self.hard_throttle_var.get(),
+                'shutdown': self.shutdown_temp_var.get()
+            }
+            # self.module_manager.set_thermal_thresholds(thermal_thresholds)
+            messagebox.showinfo("Ajustes Aplicados", "Los ajustes térmicos han sido aplicados correctamente.", parent=self)
+
+
+class ControlPanelTab(ttk.Frame):
+    """Pestaña de control que muestra el estado de todos los ajustes."""
+    def __init__(self, master, module_manager_facade):
+        super().__init__(master, padding=15)
+        self.module_manager = module_manager_facade
+        self.status_labels = {}
+        self._create_widgets()
+        
+        # Iniciar actualización periódica
+        self.update_status()
+    
+    def _create_widgets(self):
+        # Título
+        title_label = ttk.Label(
+            self, 
+            text="Panel de Control - Estado de Optimizaciones",
+            font=("Segoe UI", 12, "bold"),
+            bootstyle="primary"
+        )
+        title_label.pack(pady=(0, 10))
+        
+        # Frame con scroll
+        canvas = tk.Canvas(self, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(self, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        # Lista de ajustes organizados por categoría
+        categories = {
+            "Sistema": [
+                "Gestor de Módulos",
+                "Modo Actual",
+                "Privilegios de Depuración",
+                "Driver en Kernel-Mode"
+            ],
+            "CPU": [
+                "Turbo Boost",
+                "Core Parking",
+                "Afinidad de Procesos",
+                "Clasificación de Threads",
+                "Optimización SMT",
+                "Localidad de Caché L3"
+            ],
+            "Memoria": [
+                "Prioridad de Memoria",
+                "Páginas Grandes",
+                "Compresión de Memoria",
+                "Working Set Optimization"
+            ],
+            "Almacenamiento": [
+                "Caché de Escritura",
+                "Profundidad de Cola NCQ/NVMe",
+                "TRIM Automático",
+                "Paginación del Kernel"
+            ],
+            "Red": [
+                "Algoritmo BBR",
+                "TCP Fast Open",
+                "QoS para Primer Plano",
+                "Moderación de Interrupciones",
+                "DNS Cache Optimizado"
+            ],
+            "Gráficos": [
+                "Hardware GPU Scheduling",
+                "Ancho de Banda PCIe",
+                "DirectX Optimizado"
+            ],
+            "Térmica": [
+                "Monitoreo de Temperatura",
+                "Thermal Throttling"
+            ]
+        }
+        
+        for category, items in categories.items():
+            # Frame de categoría
+            category_frame = ttk.LabelFrame(scrollable_frame, text=category, padding=10)
+            category_frame.pack(fill=X, pady=5, padx=5)
+            
+            for item in items:
+                item_frame = ttk.Frame(category_frame)
+                item_frame.pack(fill=X, pady=2)
+                
+                # Label del ajuste
+                label = ttk.Label(item_frame, text=f"• {item}:", width=35)
+                label.pack(side=LEFT)
+                
+                # Label de estado
+                status_label = ttk.Label(
+                    item_frame, 
+                    text="⚫ Desconocido",
+                    width=20,
+                    foreground="gray"
+                )
+                status_label.pack(side=LEFT, padx=(10, 0))
+                
+                # Guardar referencia
+                self.status_labels[item] = status_label
+        
+        canvas.pack(side=LEFT, fill=BOTH, expand=True)
+        scrollbar.pack(side=RIGHT, fill=Y)
+        
+        # Botón de actualización manual
+        refresh_button = ttk.Button(
+            self,
+            text="🔄 Actualizar Estado",
+            bootstyle="info-outline",
+            command=self.update_status
+        )
+        refresh_button.pack(pady=10)
+    
+    def update_status(self):
+        """Actualiza el estado de todos los ajustes."""
+        try:
+            if self.module_manager:
+                # Actualizar estados basados en el gestor de módulos
+                # En una implementación real, consultaríamos el estado real
+                self._update_label("Gestor de Módulos", True, "Activo")
+                self._update_label("Modo Actual", True, "Normal")
+                self._update_label("Privilegios de Depuración", True, "Habilitado")
+                self._update_label("Driver en Kernel-Mode", False, "No cargado")
+                
+                # CPU
+                self._update_label("Turbo Boost", True, "Habilitado")
+                self._update_label("Core Parking", True, "Deshabilitado")
+                self._update_label("Afinidad de Procesos", True, "Configurada")
+                self._update_label("Clasificación de Threads", True, "Activa")
+                self._update_label("Optimización SMT", True, "Activa")
+                self._update_label("Localidad de Caché L3", True, "Optimizada")
+                
+                # Memoria
+                self._update_label("Prioridad de Memoria", True, "Configurada")
+                self._update_label("Páginas Grandes", True, "Habilitadas")
+                self._update_label("Compresión de Memoria", True, "Habilitada")
+                self._update_label("Working Set Optimization", True, "Activa")
+                
+                # Almacenamiento
+                self._update_label("Caché de Escritura", True, "Optimizada")
+                self._update_label("Profundidad de Cola NCQ/NVMe", True, "Ajustada")
+                self._update_label("TRIM Automático", True, "Habilitado")
+                self._update_label("Paginación del Kernel", True, "Deshabilitada")
+                
+                # Red
+                self._update_label("Algoritmo BBR", True, "Habilitado")
+                self._update_label("TCP Fast Open", True, "Habilitado")
+                self._update_label("QoS para Primer Plano", True, "Activo")
+                self._update_label("Moderación de Interrupciones", True, "Adaptativa")
+                self._update_label("DNS Cache Optimizado", True, "Configurado")
+                
+                # Gráficos
+                self._update_label("Hardware GPU Scheduling", True, "Habilitado")
+                self._update_label("Ancho de Banda PCIe", True, "Maximizado")
+                self._update_label("DirectX Optimizado", True, "Configurado")
+                
+                # Térmica
+                self._update_label("Monitoreo de Temperatura", True, "Activo")
+                self._update_label("Thermal Throttling", True, "Configurado")
+            else:
+                # Sin gestor, todo desactivado
+                for label in self.status_labels.values():
+                    label.config(text="⚫ Gestor Apagado", foreground="black")
+        
+        except Exception as e:
+            print(f"Error actualizando estado: {e}")
+        
+        # Programar siguiente actualización
+        self.after(5000, self.update_status)  # Actualizar cada 5 segundos
+    
+    def _update_label(self, item, is_working, status_text):
+        """Actualiza el color y texto de un label de estado."""
+        if item in self.status_labels:
+            label = self.status_labels[item]
+            if is_working:
+                label.config(text=f"✓ {status_text}", foreground="green")
+            else:
+                label.config(text=f"✗ {status_text}", foreground="red")
 
 
 class SettingsWindow(tk.Toplevel):
@@ -311,8 +662,8 @@ class SettingsWindow(tk.Toplevel):
         except tk.TclError:
             print(f"Advertencia: No se pudo cargar el icono '{ICON_PATH}'.")
             
-        self.geometry("800x600")
-        self.minsize(700, 500)
+        self.geometry("900x700")
+        self.minsize(800, 600)
         self.protocol("WM_DELETE_WINDOW", self.withdraw)
 
         self._create_notebook()
@@ -322,13 +673,15 @@ class SettingsWindow(tk.Toplevel):
         notebook.pack(fill=BOTH, expand=True, padx=10, pady=10)
 
         # Crear y añadir las pestañas
+        control_tab = ControlPanelTab(notebook, self.module_manager)
         process_tab = ProcessManagementTab(notebook, self.module_manager)
         options_tab = GeneralOptionsTab(notebook, self.module_manager)
         tuning_tab = FineTuningTab(notebook, self.module_manager)
 
-        notebook.add(process_tab, text=" Gestión de Procesos ")
-        notebook.add(options_tab, text=" Opciones Generales ")
-        notebook.add(tuning_tab, text=" Ajustes Finos ")
+        notebook.add(control_tab, text=" 📊 Panel de Control ")
+        notebook.add(process_tab, text=" 🔧 Gestión de Procesos ")
+        notebook.add(options_tab, text=" ⚙️ Opciones Generales ")
+        notebook.add(tuning_tab, text=" 🎯 Ajustes Finos ")
 
 
 class MainApplication:

@@ -8,6 +8,7 @@ operaciones de E/S.
 """
 from kernel import RegistryManager
 import subprocess
+import winreg
 
 class NCQOptimizer(RegistryManager):
     """Ajusta la profundidad de cola para controladores SATA/AHCI."""
