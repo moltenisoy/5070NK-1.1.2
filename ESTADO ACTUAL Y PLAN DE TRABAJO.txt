@@ -1,0 +1,23 @@
+este es un optimizador en tiempo real para windows 10 u 11:
+su modo de trabajo es con una interfaz de usuario y un gestor de modulos. estos modulos no interactuan entre ellos, es como si no existieran los emas para cada uno, ellos solo interactuan con el gestor de modulos, sin intervenir con los demas de manera directa.
+
+hasta el momento esta realizado:
+una gui basica
+el gestor demodulos ya configurado para interactura con el modulo core
+modulo core configurado
+
+faltan configurar:
+revisar los modulos restantes si no tienen errores y asegurarse de completar lo que haga falta o modificar
+el gestor de modulos para que interactue con estos modulos faltantes de configurar.
+cambiar el monitoreo de temperatura de los logs de core temp a que funcione con el dll LibreHardwareMonitorLib.dll
+agregar a la gui si aun no esta implementado: sliders para asignar temperatura maxima para thermal throtling suave, otra para thermal trotlin fuerte y otra para limite de temperatura para apgar forzadamente el euqipo
+boton para activar modo juego manualmente 
+modo ultra baja latencia agregar activador
+modo ahorro bboton y funcion
+interruptor para detener el gestor y todas las modulso o activarlo nuevamente
+pestaña de control donde estaran en forma de lista todos los ajustes que realiza el script ,y si estos esta funcionando correctamente ese texto se coloreara de color verde, si hay error en rojo y en color negro cuando el gestor esta apagado siendo un modo grafico util y facil de observr el funcionamiento del proyecto
+
+
+terminada esta tarea: calificalo sin tener en cuenta actualizaciones, y aspectos referidos a la nube, benchmarks, manejo de errores
+
+analiza como profesional en el desarrollo de sistemas operativos mi proyecto y dame por separado sugerencias para el modulo de la gui, para el gestor pirncipal y para los demas modulos por separado apra cada uno, deben ser con el objetivo de aumentar y expandir su capacidad optimizadora y mejorar el propio codigo, pero no pueden hacer referencia a overclocks de cpu o gpu, gestion o manejo de voltajes, machine learning avanzado , aspectos de la nube ni uso de modelos de ia
