@@ -23,6 +23,7 @@ import pystray
 import threading
 import psutil
 import os
+from config_manager import ConfigManager
 
 # Intentar importar plyer para notificaciones
 try:
@@ -470,7 +471,9 @@ class FineTuningTab(ttk.Frame):
     def __init__(self, master, module_manager_facade):
         super().__init__(master, padding=15)
         self.module_manager = module_manager_facade
+        self.config_manager = ConfigManager()
         self._create_widgets()
+        self._load_saved_settings()
 
     def _create_widget(self, parent, label_text, default_value, unit):
         frame = ttk.Frame(parent)
@@ -552,14 +555,30 @@ class FineTuningTab(ttk.Frame):
     
     def apply_settings(self):
         """Aplica los ajustes al gestor de módulos."""
-        if self.module_manager:
-            thermal_thresholds = {
-                'soft': self.soft_throttle_var.get(),
-                'hard': self.hard_throttle_var.get(),
-                'shutdown': self.shutdown_temp_var.get()
-            }
-            # self.module_manager.set_thermal_thresholds(thermal_thresholds)
-            messagebox.showinfo("Ajustes Aplicados", "Los ajustes térmicos han sido aplicados correctamente.", parent=self)
+        thermal_thresholds = {
+            'soft': self.soft_throttle_var.get(),
+            'hard': self.hard_throttle_var.get(),
+            'shutdown': self.shutdown_temp_var.get()
+        }
+        
+        # Guardar configuración
+        self.config_manager.set_thermal_thresholds(thermal_thresholds)
+        
+        # Aplicar al gestor de módulos si está disponible
+        if self.module_manager and hasattr(self.module_manager, 'set_thermal_thresholds'):
+            self.module_manager.set_thermal_thresholds(thermal_thresholds)
+        
+        messagebox.showinfo("Ajustes Aplicados", "Los ajustes térmicos han sido guardados y aplicados correctamente.", parent=self)
+    
+    def _load_saved_settings(self):
+        """Carga los ajustes guardados desde la configuración."""
+        try:
+            thermal_thresholds = self.config_manager.get_thermal_thresholds()
+            self.soft_throttle_var.set(thermal_thresholds.get('soft', 80))
+            self.hard_throttle_var.set(thermal_thresholds.get('hard', 90))
+            self.shutdown_temp_var.set(thermal_thresholds.get('shutdown', 100))
+        except Exception as e:
+            print(f"Error al cargar ajustes guardados: {e}")
 
 
 class ControlPanelTab(ttk.Frame):
@@ -683,55 +702,82 @@ class ControlPanelTab(ttk.Frame):
         """Actualiza el estado de todos los ajustes."""
         try:
             if self.module_manager:
-                # Actualizar estados basados en el gestor de módulos
-                # En una implementación real, consultaríamos el estado real
-                self._update_label("Gestor de Módulos", True, "Activo")
-                self._update_label("Modo Actual", True, "Normal")
-                self._update_label("Privilegios de Depuración", True, "Habilitado")
-                self._update_label("Driver en Kernel-Mode", False, "No cargado")
+                # Obtener estado real del gestor de módulos
+                is_running = getattr(self.module_manager, '_running', False)
+                
+                # Sistema
+                self._update_label("Gestor de Módulos", is_running, "Activo" if is_running else "Detenido")
+                
+                # Determinar modo actual
+                mode = "Normal"
+                if hasattr(self.module_manager, 'game_mode') and self.module_manager.game_mode:
+                    mode = "Juego"
+                elif hasattr(self.module_manager, 'ahorro_mode') and self.module_manager.ahorro_mode:
+                    mode = "Ahorro"
+                elif hasattr(self.module_manager, 'extremo_mode') and self.module_manager.extremo_mode:
+                    mode = "Extremo"
+                self._update_label("Modo Actual", is_running, mode)
+                
+                # Verificar privilegios de depuración
+                import core
+                debug_priv = hasattr(core, 'enable_debug_privilege') and core.enable_debug_privilege()
+                self._update_label("Privilegios de Depuración", debug_priv, "Habilitado" if debug_priv else "No disponible")
+                
+                # Driver en Kernel-Mode
+                driver_loaded = False
+                if hasattr(self.module_manager, 'driver_km'):
+                    driver_loaded = getattr(self.module_manager.driver_km, 'driver_loaded', False)
+                self._update_label("Driver en Kernel-Mode", driver_loaded, "Cargado" if driver_loaded else "No cargado")
+                
+                # Para otros ajustes, mostrar estado basado en si el gestor está activo
+                # y si los módulos están cargados
+                modules_active = is_running
                 
                 # CPU
-                self._update_label("Turbo Boost", True, "Habilitado")
-                self._update_label("Core Parking", True, "Deshabilitado")
-                self._update_label("Afinidad de Procesos", True, "Configurada")
-                self._update_label("Clasificación de Threads", True, "Activa")
-                self._update_label("Optimización SMT", True, "Activa")
-                self._update_label("Localidad de Caché L3", True, "Optimizada")
+                self._update_label("Turbo Boost", modules_active, "Habilitado" if modules_active else "Inactivo")
+                self._update_label("Core Parking", modules_active, "Optimizado" if modules_active else "Por defecto")
+                self._update_label("Afinidad de Procesos", modules_active, "Configurada" if modules_active else "Sin configurar")
+                self._update_label("Clasificación de Threads", modules_active, "Activa" if modules_active else "Inactiva")
+                self._update_label("Optimización SMT", modules_active, "Activa" if modules_active else "Inactiva")
+                self._update_label("Localidad de Caché L3", modules_active, "Optimizada" if modules_active else "Por defecto")
                 
                 # Memoria
-                self._update_label("Prioridad de Memoria", True, "Configurada")
-                self._update_label("Páginas Grandes", True, "Habilitadas")
-                self._update_label("Compresión de Memoria", True, "Habilitada")
-                self._update_label("Working Set Optimization", True, "Activa")
+                self._update_label("Prioridad de Memoria", modules_active, "Configurada" if modules_active else "Por defecto")
+                self._update_label("Páginas Grandes", modules_active, "Habilitadas" if modules_active else "Por defecto")
+                self._update_label("Compresión de Memoria", modules_active, "Activa" if modules_active else "Por defecto")
+                self._update_label("Working Set Optimization", modules_active, "Activa" if modules_active else "Inactiva")
                 
                 # Almacenamiento
-                self._update_label("Caché de Escritura", True, "Optimizada")
-                self._update_label("Profundidad de Cola NCQ/NVMe", True, "Ajustada")
-                self._update_label("TRIM Automático", True, "Habilitado")
-                self._update_label("Paginación del Kernel", True, "Deshabilitada")
+                self._update_label("Caché de Escritura", modules_active, "Optimizada" if modules_active else "Por defecto")
+                self._update_label("Profundidad de Cola NCQ/NVMe", modules_active, "Ajustada" if modules_active else "Por defecto")
+                self._update_label("TRIM Automático", modules_active, "Configurado" if modules_active else "Por defecto")
+                self._update_label("Paginación del Kernel", modules_active, "Optimizada" if modules_active else "Por defecto")
                 
                 # Red
-                self._update_label("Algoritmo BBR", True, "Habilitado")
-                self._update_label("TCP Fast Open", True, "Habilitado")
-                self._update_label("QoS para Primer Plano", True, "Activo")
-                self._update_label("Moderación de Interrupciones", True, "Adaptativa")
-                self._update_label("DNS Cache Optimizado", True, "Configurado")
+                self._update_label("Algoritmo BBR", modules_active, "Habilitado" if modules_active else "Por defecto")
+                self._update_label("TCP Fast Open", modules_active, "Habilitado" if modules_active else "Por defecto")
+                self._update_label("QoS para Primer Plano", modules_active, "Activo" if modules_active else "Inactivo")
+                self._update_label("Moderación de Interrupciones", modules_active, "Optimizada" if modules_active else "Por defecto")
+                self._update_label("DNS Cache Optimizado", modules_active, "Configurado" if modules_active else "Por defecto")
                 
                 # Gráficos
-                self._update_label("Hardware GPU Scheduling", True, "Habilitado")
-                self._update_label("Ancho de Banda PCIe", True, "Maximizado")
-                self._update_label("DirectX Optimizado", True, "Configurado")
+                self._update_label("Hardware GPU Scheduling", modules_active, "Habilitado" if modules_active else "Por defecto")
+                self._update_label("Ancho de Banda PCIe", modules_active, "Optimizado" if modules_active else "Por defecto")
+                self._update_label("DirectX Optimizado", modules_active, "Configurado" if modules_active else "Por defecto")
                 
                 # Térmica
-                self._update_label("Monitoreo de Temperatura", True, "Activo")
-                self._update_label("Thermal Throttling", True, "Configurado")
+                self._update_label("Monitoreo de Temperatura", modules_active, "Activo" if modules_active else "Inactivo")
+                thermal_active = is_running and hasattr(self.module_manager, 'thermal_thresholds')
+                self._update_label("Thermal Throttling", thermal_active, "Configurado" if thermal_active else "Inactivo")
             else:
                 # Sin gestor, todo desactivado
                 for label in self.status_labels.values():
-                    label.config(text="⚫ Gestor Apagado", foreground="black")
+                    label.config(text="⚫ Gestor No Iniciado", foreground="gray")
         
         except Exception as e:
             print(f"Error actualizando estado: {e}")
+            import traceback
+            traceback.print_exc()
         
         # Programar siguiente actualización
         self.after(5000, self.update_status)  # Actualizar cada 5 segundos

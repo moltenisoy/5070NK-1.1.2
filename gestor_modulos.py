@@ -1288,15 +1288,17 @@ class GestorModulos(threading.Thread):
         self.gui = gui_facade
         self._running = False
 
+        # Cargar configuración guardada
+        from config_manager import ConfigManager
+        self.config_manager = ConfigManager()
+
         # --- Estado gestionado por la GUI ---
-        self.game_mode = False
-        self.ahorro_mode = False
-        self.extremo_mode = False  # ✅ NUEVO: Modo Extreme Low Latency
+        self.game_mode = self.config_manager.get('game_mode_enabled', False)
+        self.ahorro_mode = self.config_manager.get('ahorro_mode_enabled', False)
+        self.extremo_mode = self.config_manager.get('extremo_mode_enabled', False)
         self.user_whitelist = set()
         self.user_gamelist = set()
-        self.thermal_thresholds = {
-            'soft': 85, 'hard': 95, 'shutdown': 100
-        }
+        self.thermal_thresholds = self.config_manager.get_thermal_thresholds()
         
         # --- Lista negra crítica ---
         self.critical_blacklist = {
@@ -1455,7 +1457,108 @@ class GestorModulos(threading.Thread):
             self.modo_extreme.desactivar()
         
         gc.enable()
+    
+    def set_thermal_thresholds(self, thresholds):
+        """
+        Establece los umbrales térmicos para el sistema.
+        
+        :param thresholds: Diccionario con claves 'soft', 'hard', 'shutdown'
+        """
+        if not isinstance(thresholds, dict):
+            logger.error("[GestorModulos] Thresholds debe ser un diccionario")
+            return False
+        
+        # Validar valores
+        soft = thresholds.get('soft', 80)
+        hard = thresholds.get('hard', 90)
+        shutdown = thresholds.get('shutdown', 100)
+        
+        if not (60 <= soft <= 95 and 70 <= hard <= 100 and 80 <= shutdown <= 110):
+            logger.error("[GestorModulos] Valores de temperatura fuera de rango válido")
+            return False
+        
+        if not (soft < hard < shutdown):
+            logger.error("[GestorModulos] Los umbrales deben ser: soft < hard < shutdown")
+            return False
+        
+        self.thermal_thresholds = {
+            'soft': int(soft),
+            'hard': int(hard),
+            'shutdown': int(shutdown)
+        }
+        
+        # Guardar en configuración
+        self.config_manager.set_thermal_thresholds(self.thermal_thresholds)
+        
+        logger.info(f"[GestorModulos] ✓ Umbrales térmicos actualizados: {self.thermal_thresholds}")
+        return True
+    
+    def get_status(self):
+        """
+        Retorna el estado actual del gestor.
+        
+        :return: Diccionario con información de estado
+        """
+        return {
+            'running': self._running,
+            'game_mode': self.game_mode,
+            'ahorro_mode': self.ahorro_mode,
+            'extremo_mode': self.extremo_mode,
+            'thermal_thresholds': self.thermal_thresholds,
+            'driver_loaded': self.driver_km.driver_loaded if hasattr(self, 'driver_km') else False,
+            'extreme_mode_active': self.modo_extreme.activo if hasattr(self, 'modo_extreme') else False,
+            'foreground_pid': self.foreground_pid,
+            'foreground_name': self.foreground_name,
+            'stats': self.stats
+        }
 
+    def on_foreground_change(self, pid):
+        """
+        Callback cuando cambia la ventana de primer plano.
+        Usa el debouncer para evitar cambios demasiado rápidos.
+        
+        :param pid: PID del nuevo proceso en primer plano
+        """
+        if hasattr(self, 'foreground_debouncer'):
+            self.foreground_debouncer.handle_event(pid)
+    
+    def _on_foreground_stable(self, pid):
+        """
+        Callback cuando la ventana de primer plano se ha estabilizado (después del debounce).
+        
+        :param pid: PID del proceso en primer plano
+        """
+        try:
+            # Obtener nombre del proceso
+            try:
+                proc = psutil.Process(pid)
+                process_name = proc.name()
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                return
+            
+            # Actualizar estado
+            self.foreground_pid = pid
+            self.foreground_name = process_name
+            self.stats['foreground_changes'] += 1
+            
+            logger.info(f"[GestorModulos] Ventana de primer plano: {process_name} (PID: {pid})")
+            
+            # Aplicar optimizaciones inmediatamente
+            if not self.is_blacklisted(process_name):
+                self.apply_settings_to_process_group(pid, is_foreground=True)
+        
+        except Exception as e:
+            logger.error(f"[GestorModulos] Error en _on_foreground_stable: {e}")
+    
+    def _print_stats(self):
+        """Imprime estadísticas del gestor."""
+        try:
+            logger.info(f"[GestorModulos] Estadísticas: {self.stats['optimizations_applied']} optimizaciones, "
+                       f"{len(self.stats['processes_optimized'])} procesos únicos, "
+                       f"{self.stats['foreground_changes']} cambios de ventana")
+        except Exception as e:
+            logger.debug(f"Error imprimiendo stats: {e}")
+    
     def _apply_initial_optimizations(self):
         """Optimizaciones iniciales."""
         logger.info("--- APLICANDO OPTIMIZACIONES INICIALES ---")
