@@ -18,15 +18,111 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import ttkbootstrap as tb
 from ttkbootstrap.constants import *
-from PIL import Image, ImageTk
+from PIL import Image, ImageTk, ImageDraw, ImageFont
 import pystray
 import threading
 import psutil
 import os
 
+# Intentar importar plyer para notificaciones
+try:
+    from plyer import notification
+    PLYER_AVAILABLE = True
+except ImportError:
+    PLYER_AVAILABLE = False
+    print("Advertencia: plyer no está instalado. Las notificaciones no estarán disponibles.")
+
 # --- Constantes y Configuración de la GUI ---
 APP_NAME = "Motor de Optimización Avanzada"
 ICON_PATH = "1.ico"  # Asegúrate de que el archivo 1.ico esté en el mismo directorio
+
+# =============================================================================
+# --- SISTEMA DE NOTIFICACIONES TOAST ---
+# =============================================================================
+
+class NotificationManager:
+    """Gestor de notificaciones del sistema"""
+    
+    @staticmethod
+    def notify_thermal_warning(temperature):
+        """Notifica cuando hay una alerta térmica"""
+        if not PLYER_AVAILABLE:
+            return
+        
+        try:
+            notification.notify(
+                title="⚠️ Alerta Térmica",
+                message=f"Temperatura: {temperature}°C\nThrottling activado",
+                app_icon=ICON_PATH if os.path.exists(ICON_PATH) else None,
+                timeout=10
+            )
+        except Exception as e:
+            print(f"Error al enviar notificación térmica: {e}")
+    
+    @staticmethod
+    def notify_optimization_applied(process_name):
+        """Notifica cuando se aplica una optimización"""
+        if not PLYER_AVAILABLE:
+            return
+        
+        try:
+            notification.notify(
+                title="✓ Optimización Aplicada",
+                message=f"Proceso optimizado: {process_name}",
+                app_icon=ICON_PATH if os.path.exists(ICON_PATH) else None,
+                timeout=5
+            )
+        except Exception as e:
+            print(f"Error al enviar notificación de optimización: {e}")
+    
+    @staticmethod
+    def notify_mode_changed(mode):
+        """Notifica cuando cambia el modo de operación"""
+        if not PLYER_AVAILABLE:
+            return
+        
+        try:
+            notification.notify(
+                title="🔄 Modo Cambiado",
+                message=f"Nuevo modo: {mode}",
+                app_icon=ICON_PATH if os.path.exists(ICON_PATH) else None,
+                timeout=5
+            )
+        except Exception as e:
+            print(f"Error al enviar notificación de cambio de modo: {e}")
+    
+    @staticmethod
+    def notify_driver_status(loaded):
+        """Notifica el estado del driver en kernel"""
+        if not PLYER_AVAILABLE:
+            return
+        
+        try:
+            status = "activado" if loaded else "desactivado"
+            notification.notify(
+                title=f"⚙️ Driver en Kernel {status.capitalize()}",
+                message=f"El driver en modo kernel ha sido {status}",
+                app_icon=ICON_PATH if os.path.exists(ICON_PATH) else None,
+                timeout=5
+            )
+        except Exception as e:
+            print(f"Error al enviar notificación de driver: {e}")
+    
+    @staticmethod
+    def notify_critical_error(error_message):
+        """Notifica errores críticos"""
+        if not PLYER_AVAILABLE:
+            return
+        
+        try:
+            notification.notify(
+                title="❌ Error Crítico",
+                message=error_message,
+                app_icon=ICON_PATH if os.path.exists(ICON_PATH) else None,
+                timeout=10
+            )
+        except Exception as e:
+            print(f"Error al enviar notificación de error crítico: {e}")
 
 class ProcessManagementTab(ttk.Frame):
     """Pestaña para la gestión de procesos."""

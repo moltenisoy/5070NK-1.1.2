@@ -74,3 +74,78 @@ class MemoryScrubbingOptimizer:
             subprocess.run(['mdsched.exe'], creationflags=subprocess.CREATE_NO_WINDOW)
         except Exception as e:
             print(f"No se pudo iniciar mdsched.exe: {e}")
+
+
+class MemoryBalloon:
+    """Libera memoria proactivamente cuando es necesario (Memory Ballooning)"""
+    
+    def __init__(self, low_threshold_mb=2048, high_threshold_mb=4096):
+        self.low_threshold = low_threshold_mb * 1024 * 1024  # Convertir a bytes
+        self.high_threshold = high_threshold_mb * 1024 * 1024
+        print(f"[MemoryBalloon] Inicializado: umbral bajo={low_threshold_mb}MB, alto={high_threshold_mb}MB")
+    
+    def check_and_balloon(self):
+        """Verifica memoria disponible y libera si es necesario"""
+        memory = psutil.virtual_memory()
+        available = memory.available
+        
+        if available < self.low_threshold:
+            print(f"[MemoryBalloon] Memoria crítica: {available / 1024 / 1024:.0f}MB disponible")
+            self.aggressive_trim()
+        elif available < self.high_threshold:
+            print(f"[MemoryBalloon] Memoria baja: {available / 1024 / 1024:.0f}MB disponible")
+            self.moderate_trim()
+    
+    def aggressive_trim(self):
+        """Recorte agresivo de memoria"""
+        print("[MemoryBalloon] Iniciando recorte agresivo de memoria")
+        
+        trimmed_count = 0
+        for proc in psutil.process_iter(['pid', 'name', 'memory_info']):
+            try:
+                if self.is_trimmable(proc):
+                    handle = kernel32.OpenProcess(0x1F0FFF, False, proc.info['pid'])
+                    if handle:
+                        # Recortar working set
+                        kernel32.SetProcessWorkingSetSizeEx(handle, -1, -1, 0)
+                        kernel32.CloseHandle(handle)
+                        trimmed_count += 1
+            except Exception:
+                pass
+        
+        print(f"[MemoryBalloon] Recortados {trimmed_count} procesos")
+    
+    def moderate_trim(self):
+        """Recorte moderado de memoria"""
+        print("[MemoryBalloon] Iniciando recorte moderado de memoria")
+        
+        trimmed_count = 0
+        for proc in psutil.process_iter(['pid', 'name', 'memory_info']):
+            try:
+                # Solo recortar procesos con más de 100MB de memoria
+                if self.is_trimmable(proc) and proc.info['memory_info'].rss > 100 * 1024 * 1024:
+                    handle = kernel32.OpenProcess(0x1F0FFF, False, proc.info['pid'])
+                    if handle:
+                        kernel32.SetProcessWorkingSetSizeEx(handle, -1, -1, 0)
+                        kernel32.CloseHandle(handle)
+                        trimmed_count += 1
+            except Exception:
+                pass
+        
+        print(f"[MemoryBalloon] Recortados {trimmed_count} procesos")
+    
+    def is_trimmable(self, proc):
+        """Determina si un proceso puede ser recortado"""
+        # Lista de procesos críticos que no deben ser recortados
+        critical_processes = [
+            'system', 'system idle process', 'registry',
+            'smss.exe', 'csrss.exe', 'wininit.exe', 'services.exe',
+            'lsass.exe', 'svchost.exe', 'dwm.exe', 'explorer.exe',
+            'winlogon.exe', 'fontdrvhost.exe'
+        ]
+        
+        try:
+            name = proc.info['name'].lower()
+            return name not in critical_processes
+        except Exception:
+            return False
