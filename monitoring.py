@@ -9,6 +9,8 @@ esta información al Gestor para que tome decisiones.
 import subprocess
 import json
 import os
+import time
+import ctypes
 import psutil
 from core import kernel32, PROCESSENTRY32, TH32CS_SNAPPROCESS, INVALID_HANDLE_VALUE
 

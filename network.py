@@ -8,6 +8,7 @@ estáticas (Registro) como dinámicas (PowerShell, Ping).
 from kernel import RegistryManager
 import subprocess
 import psutil
+import winreg
 
 class NetworkStackOptimizer(RegistryManager):
     """Ajusta parámetros clave de la pila TCP/IP."""
